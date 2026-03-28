@@ -51,9 +51,9 @@ function App() {
       </nav>
       <div className="pt-10">
         {page === 'home'    && <HomePage onNavigate={setPage} />}
-        {page === 'level1'  && <Level1Page />}
+        {page === 'level1'  && <Level1Page onHome={() => setPage('home')} />}
         {page === 'level2'  && <Level2Page />}
-        {page === 'phrase'  && <PhrasePage />}
+        {page === 'phrase'  && <PhrasePage onHome={() => setPage('home')} />}
         {page === 'article' && <ArticlePage />}
       </div>
     </div>

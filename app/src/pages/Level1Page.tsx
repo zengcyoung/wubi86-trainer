@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { LEVEL1 } from '../data/level1'
 import { LEVEL1_ROWS } from '../data/keyboard'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { advance, recordMistake, resetLesson } from '../store/progressSlice'
+import ResultPage from './ResultPage'
+import type { RoundResult, MistakeEntry } from './ResultPage'
 
-// 按 LEVEL1_ROWS 顺序排列练习序列
 const PRACTICE_SEQUENCE = LEVEL1_ROWS.flatMap(row =>
   row.keys.map(key => {
     const entry = LEVEL1.find(e => e.key === key)!
@@ -14,71 +15,99 @@ const PRACTICE_SEQUENCE = LEVEL1_ROWS.flatMap(row =>
 
 type InputState = 'idle' | 'correct' | 'wrong'
 
-export default function Level1Page() {
+export default function Level1Page({ onHome }: { onHome?: () => void }) {
   const dispatch = useAppDispatch()
   const { currentIndex, correct, mistakes } = useAppSelector(
     s => s.progress.lessons.level1
   )
 
-  // 循环：到末尾后从头来
   const safeIndex = currentIndex % PRACTICE_SEQUENCE.length
   const current = PRACTICE_SEQUENCE[safeIndex]
   const [inputState, setInputState] = useState<InputState>('idle')
   const [shake, setShake] = useState(false)
+  // 本轮错误记录：char → wrongCount
+  const [roundMistakes, setRoundMistakes] = useState<Record<string, number>>({})
+  const [showResult, setShowResult] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // 每次切换字时聚焦
+  // 检测是否完成一轮（回到 index 0 且打过至少一轮）
+  const prevIndexRef = useRef(currentIndex)
+  useEffect(() => {
+    const prev = prevIndexRef.current
+    prevIndexRef.current = currentIndex
+    // 从最后一个跨越到下一轮时触发结算
+    if (prev % PRACTICE_SEQUENCE.length === PRACTICE_SEQUENCE.length - 1
+      && currentIndex % PRACTICE_SEQUENCE.length === 0
+      && currentIndex > 0) {
+      setShowResult(true)
+    }
+  }, [currentIndex])
+
   useEffect(() => {
     inputRef.current?.focus()
   }, [safeIndex])
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     const key = e.key.toLowerCase()
     if (key !== current.key) {
-      // 错误
       setInputState('wrong')
       setShake(true)
       dispatch(recordMistake({ lesson: 'level1' }))
-      setTimeout(() => {
-        setInputState('idle')
-        setShake(false)
-      }, 500)
+      setRoundMistakes(prev => ({ ...prev, [current.char]: (prev[current.char] ?? 0) + 1 }))
+      setTimeout(() => { setInputState('idle'); setShake(false) }, 500)
       return
     }
-    // 正确
     setInputState('correct')
     dispatch(advance({ lesson: 'level1', char: current.char }))
     setTimeout(() => setInputState('idle'), 200)
+  }, [current, dispatch])
+
+  const accuracy = correct + mistakes > 0
+    ? Math.round((correct / (correct + mistakes)) * 100) : 100
+  const round = Math.floor(currentIndex / PRACTICE_SEQUENCE.length) + 1
+
+  const buildResult = (): RoundResult => {
+    const mistakeList: MistakeEntry[] = Object.entries(roundMistakes)
+      .map(([text, wrongCount]) => {
+        const entry = PRACTICE_SEQUENCE.find(e => e.char === text)
+        return { text, code: entry?.key ?? '?', wrongCount }
+      })
+      .sort((a, b) => b.wrongCount - a.wrongCount)
+    return { mode: 'level1', correct, mistakes, mistakeList }
   }
 
-  // 计算当前轮次（每轮 25 个字）
-  const round = Math.floor(currentIndex / PRACTICE_SEQUENCE.length) + 1
-  const accuracy =
-    correct + mistakes > 0
-      ? Math.round((correct / (correct + mistakes)) * 100)
-      : 100
+  const handleRetry = () => {
+    dispatch(resetLesson({ lesson: 'level1' }))
+    setRoundMistakes({})
+    setShowResult(false)
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
+  if (showResult) {
+    return (
+      <ResultPage
+        result={buildResult()}
+        onRetry={handleRetry}
+        onNext={() => { setShowResult(false); /* 可跳到 level2 */ }}
+        onHome={onHome ?? (() => setShowResult(false))}
+      />
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center px-4 py-10 gap-8 select-none">
-      {/* 标题 */}
-      <h1 className="text-2xl font-bold tracking-widest text-amber-400">
-        一级简码练习
-      </h1>
+      <h1 className="text-2xl font-bold tracking-widest text-amber-400">一级简码练习</h1>
 
-      {/* 统计栏 */}
       <div className="flex gap-6 text-sm text-gray-400">
         <span>第 <span className="text-white font-semibold">{round}</span> 轮</span>
         <span>进度 <span className="text-white font-semibold">{safeIndex + 1}</span>/25</span>
         <span>正确率 <span className={`font-semibold ${accuracy >= 90 ? 'text-green-400' : accuracy >= 70 ? 'text-yellow-400' : 'text-red-400'}`}>{accuracy}%</span></span>
         <button
-          onClick={() => dispatch(resetLesson({ lesson: 'level1' }))}
+          onClick={handleRetry}
           className="text-gray-500 hover:text-gray-300 transition-colors"
-        >
-          重置
-        </button>
+        >重置</button>
       </div>
 
-      {/* 键盘行总览 */}
       <div className="w-full max-w-xl flex flex-col gap-3">
         {LEVEL1_ROWS.map(row => (
           <div key={row.label} className="flex justify-center gap-2">
@@ -112,37 +141,15 @@ export default function Level1Page() {
         ))}
       </div>
 
-      {/* 当前要打的字 */}
-      <div
-        className={`
-          mt-4 flex flex-col items-center gap-2
-          transition-all duration-100
-          ${shake ? 'animate-[shake_0.3s_ease-in-out]' : ''}
-        `}
-      >
-        <div
-          className={`
-            text-8xl font-bold transition-colors duration-150
-            ${inputState === 'correct' ? 'text-green-400' : inputState === 'wrong' ? 'text-red-400' : 'text-white'}
-          `}
-        >
+      <div className={`mt-4 flex flex-col items-center gap-2 transition-all duration-100 ${shake ? 'animate-[shake_0.3s_ease-in-out]' : ''}`}>
+        <div className={`text-8xl font-bold transition-colors duration-150 ${inputState === 'correct' ? 'text-green-400' : inputState === 'wrong' ? 'text-red-400' : 'text-white'}`}>
           {current.char}
         </div>
-        <div className="text-2xl font-mono text-amber-300 tracking-widest">
-          {current.key.toUpperCase()}
-        </div>
+        <div className="text-2xl font-mono text-amber-300 tracking-widest">{current.key.toUpperCase()}</div>
       </div>
 
-      {/* 隐藏 input，捕获键盘输入 */}
-      <input
-        ref={inputRef}
-        className="opacity-0 absolute w-0 h-0"
-        onKeyDown={handleKeyDown}
-        readOnly
-        autoFocus
-      />
-
-      <p className="text-gray-600 text-sm">按下对应键位继续</p>
+      <input ref={inputRef} className="opacity-0 absolute w-0 h-0" onKeyDown={handleKeyDown} readOnly autoFocus />
+      <p className="text-gray-600 text-sm">按下对应键位继续 · 完成一轮后显示结算</p>
     </div>
   )
 }

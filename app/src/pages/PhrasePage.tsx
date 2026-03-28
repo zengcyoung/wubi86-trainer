@@ -3,6 +3,10 @@ import { PHRASES_TIER1, PHRASES_TIER2 } from '../data/phrases'
 import type { PhraseEntry } from '../data/phrases'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { advance, recordMistake, resetLesson, jumpTo } from '../store/progressSlice'
+import ResultPage from './ResultPage'
+import type { MistakeEntry } from './ResultPage'
+
+const ROUND_SIZE = 50  // 每 50 个词触发一次结算
 
 type Tier = 'tier1' | 'tier2' | 'all'
 
@@ -63,7 +67,7 @@ function CodeDisplay({
   )
 }
 
-export default function PhrasePage() {
+export default function PhrasePage({ onHome }: { onHome?: () => void }) {
   const dispatch = useAppDispatch()
   const phraseProgress = useAppSelector(s => s.progress.lessons.phrase)
 
@@ -72,6 +76,23 @@ export default function PhrasePage() {
 
   const safeIndex = phraseProgress.currentIndex % sequence.length
   const current = sequence[safeIndex]
+
+  const [roundMistakes, setRoundMistakes] = useState<Record<string, { code: string; count: number }>>({})
+  const [roundCorrect, setRoundCorrect] = useState(0)
+  const [roundMistakeCount, setRoundMistakeCount] = useState(0)
+  const [showResult, setShowResult] = useState(false)
+
+  // 每打完 ROUND_SIZE 个词触发结算
+  const prevIndexRef = useRef(phraseProgress.currentIndex)
+  useEffect(() => {
+    const prev = prevIndexRef.current
+    prevIndexRef.current = phraseProgress.currentIndex
+    const crossedBoundary =
+      Math.floor(prev / ROUND_SIZE) < Math.floor(phraseProgress.currentIndex / ROUND_SIZE)
+    if (crossedBoundary && phraseProgress.currentIndex > 0) {
+      setShowResult(true)
+    }
+  }, [phraseProgress.currentIndex])
 
   const [typed, setTyped] = useState('')
   const [inputState, setInputState] = useState<InputState>('idle')
@@ -105,6 +126,11 @@ export default function PhrasePage() {
           setInputState('wrong')
           setShake(true)
           dispatch(recordMistake({ lesson: 'phrase' }))
+          setRoundMistakeCount(c => c + 1)
+          setRoundMistakes(prev => ({
+            ...prev,
+            [current.text]: { code: current.code, count: (prev[current.text]?.count ?? 0) + 1 },
+          }))
           setTimeout(() => {
             setInputState('idle')
             setShake(false)
@@ -120,6 +146,7 @@ export default function PhrasePage() {
           setTyped(full)
           setInputState('correct')
           dispatch(advance({ lesson: 'phrase', char: current.text }))
+          setRoundCorrect(c => c + 1)
           setTimeout(() => {
             setInputState('idle')
             setTyped('')
@@ -129,6 +156,11 @@ export default function PhrasePage() {
           setInputState('wrong')
           setShake(true)
           dispatch(recordMistake({ lesson: 'phrase' }))
+          setRoundMistakeCount(c => c + 1)
+          setRoundMistakes(prev => ({
+            ...prev,
+            [current.text]: { code: current.code, count: (prev[current.text]?.count ?? 0) + 1 },
+          }))
           setTimeout(() => {
             setInputState('idle')
             setShake(false)
@@ -145,7 +177,30 @@ export default function PhrasePage() {
     pCorrect + pMistakes > 0
       ? Math.round((pCorrect / (pCorrect + pMistakes)) * 100)
       : 100
-  const round = Math.floor(phraseProgress.currentIndex / sequence.length) + 1
+  const round = Math.floor(phraseProgress.currentIndex / ROUND_SIZE) + 1
+
+  const handleRetry = () => {
+    dispatch(resetLesson({ lesson: 'phrase' }))
+    setTyped('')
+    setRoundMistakes({})
+    setRoundCorrect(0)
+    setRoundMistakeCount(0)
+    setShowResult(false)
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
+  if (showResult) {
+    const mistakeList: MistakeEntry[] = Object.entries(roundMistakes)
+      .map(([text, { code, count }]) => ({ text, code, wrongCount: count }))
+      .sort((a, b) => b.wrongCount - a.wrongCount)
+    return (
+      <ResultPage
+        result={{ mode: 'phrase', correct: roundCorrect, mistakes: roundMistakeCount, mistakeList }}
+        onRetry={handleRetry}
+        onHome={onHome ?? (() => setShowResult(false))}
+      />
+    )
+  }
 
   // 上下文预览：当前词前3、后6
   const previewStart = Math.max(0, safeIndex - 3)
@@ -169,7 +224,7 @@ export default function PhrasePage() {
             }`}>{accuracy}%</span>
           </span>
           <button
-            onClick={() => { dispatch(resetLesson({ lesson: 'phrase' })); setTyped('') }}
+            onClick={handleRetry}
             className="text-gray-500 hover:text-gray-300 transition-colors"
           >重置</button>
         </div>
