@@ -1,7 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
 
-export type LessonKey = 'level1' | 'level2' | 'article'
+export type LessonKey = 'level1' | 'level2' | 'phrase' | 'article'
 
 interface LessonProgress {
   /** 当前练习索引 */
@@ -10,7 +10,7 @@ interface LessonProgress {
   correct: number
   /** 本轮错误次数 */
   mistakes: number
-  /** 已完整过一遍的字（key = char，value = 累计正确数） */
+  /** 已完整过一遍的字/词（key = text，value = 累计正确数） */
   mastered: Record<string, number>
 }
 
@@ -29,6 +29,7 @@ const initialState: ProgressState = {
   lessons: {
     level1: defaultLesson(),
     level2: defaultLesson(),
+    phrase: defaultLesson(),
     article: defaultLesson(),
   },
 }

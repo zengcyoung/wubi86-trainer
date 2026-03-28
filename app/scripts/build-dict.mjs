@@ -7,6 +7,7 @@
  *   src/data/level1.ts        — 一级简码（25个字，单字母编码，取 weight 最高的）
  *   src/data/level2.ts        — 二级简码（单字，2字母编码，取 weight 最高的）
  *   src/data/level2Groups.ts  — 二级简码按第一键分组，组内按第二键键盘行排列
+ *   src/data/phrases.ts       — 词组（4码，2字以上），按 weight 降序，去重
  */
 
 import fs from 'node:fs'
@@ -187,12 +188,69 @@ ${dictEntries.join(',\n')}
 ])
 `
 
+// ── 词组：4码、2字以上，按 weight 降序，code 去重（取最高 weight 的词） ──
+/** @type {Map<string, {text:string, weight:number, wordLen:number}>} */
+const phraseMap = new Map()
+for (const { text, code, weight } of entries) {
+  const wl = [...text].length
+  if (wl < 2) continue
+  if (code.length !== 4) continue
+  if (!code.match(/^[a-z]{4}$/)) continue
+  const existing = phraseMap.get(code)
+  // 同编码取 weight 最高；weight 相同取字数更少（更常用）
+  if (!existing || weight > existing.weight || (weight === existing.weight && wl < existing.wordLen)) {
+    phraseMap.set(code, { text, weight, wordLen: wl })
+  }
+}
+
+/** @type {Array<{text:string, code:string, weight:number, wordLen:number}>} */
+const phrases = [...phraseMap.entries()]
+  .map(([code, { text, weight, wordLen }]) => ({ text, code, weight, wordLen }))
+  .sort((a, b) => b.weight - a.weight || a.wordLen - b.wordLen)
+
+// phrases.ts — 分三档输出，方便前端按难度加载
+// tier1: weight >= 30  (~1589个，高频核心词)
+// tier2: weight >= 20  (全量 ~62000+)
+const tier1 = phrases.filter(p => p.weight >= 30)
+const tier2 = phrases.filter(p => p.weight >= 20 && p.weight < 30)
+
+const phraseEntryTs = (p) =>
+  `  { text: ${JSON.stringify(p.text)}, code: ${JSON.stringify(p.code)}, weight: ${p.weight}, wordLen: ${p.wordLen} }`
+
+const phraseTs = `// 自动生成，勿手动修改 — scripts/build-dict.mjs
+// 词组码表：4码，按 weight 降序排列
+// tier1: weight >= 30 (高频词，${tier1.length}个)
+// tier2: weight == 20 (扩展词，${tier2.length}个)
+
+export interface PhraseEntry {
+  text: string    // 词组文字
+  code: string    // 4位编码
+  weight: number  // 词频权重
+  wordLen: number // 词组字数
+}
+
+/** 高频词组（weight ≥ 30），共 ${tier1.length} 个，适合初学练习 */
+export const PHRASES_TIER1: PhraseEntry[] = [
+${tier1.map(phraseEntryTs).join(',\n')}
+]
+
+/** 扩展词组（weight = 20），共 ${tier2.length} 个 */
+export const PHRASES_TIER2: PhraseEntry[] = [
+${tier2.map(phraseEntryTs).join(',\n')}
+]
+
+/** 全量词组（tier1 + tier2），共 ${tier1.length + tier2.length} 个 */
+export const PHRASES_ALL: PhraseEntry[] = [...PHRASES_TIER1, ...PHRASES_TIER2]
+`
+
 fs.writeFileSync(path.join(OUT_DIR, 'level1.ts'), l1Ts)
 fs.writeFileSync(path.join(OUT_DIR, 'level2.ts'), l2Ts)
 fs.writeFileSync(path.join(OUT_DIR, 'level2Groups.ts'), l2gTs)
 fs.writeFileSync(path.join(OUT_DIR, 'dict.ts'), dictTs)
+fs.writeFileSync(path.join(OUT_DIR, 'phrases.ts'), phraseTs)
 
 console.log(`✅ level1.ts        — ${level1.length} entries`)
 console.log(`✅ level2.ts        — ${level2.length} entries`)
 console.log(`✅ level2Groups.ts  — ${level2Groups.length} groups`)
 console.log(`✅ dict.ts          — ${dictMap.size} unique chars`)
+console.log(`✅ phrases.ts       — tier1: ${tier1.length}, tier2: ${tier2.length}, total: ${tier1.length + tier2.length}`)
