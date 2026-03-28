@@ -1,0 +1,13 @@
+# rime source (大文件，不需要提交)
+rime-source/
+
+# node
+node_modules/
+app/node_modules/
+
+# build output
+app/dist/
+
+# env
+.env
+.env.local
