@@ -13,20 +13,20 @@ type Mode = 'practice' | 'review'
 
 const KB_ROW_ORDER = ['gfdsa', 'hjklm', 'trewq', 'yuiop', 'nbvcx']
 
-// 展开完整序列（用于随机打乱）
-const ALL_ENTRIES = LEVEL2_GROUPS.flatMap(g => g.rows.flatMap(r => r.entries))
+// 每组内条目数
+const GROUP_SIZES = LEVEL2_GROUPS.map(g => ({
+  firstKey: g.firstKey,
+  size: g.rows.reduce((s, r) => s + r.entries.length, 0),
+}))
 
-// 原始分组起始 index（备用，当前 practice 模式用洗牌后位置）
-const _GROUP_START_BASE: Record<string, number> = (() => {
-  const map: Record<string, number> = {}
-  let idx = 0
-  for (const g of LEVEL2_GROUPS) {
-    map[g.firstKey] = idx
-    for (const r of g.rows) idx += r.entries.length
-  }
-  return map
-})()
-void _GROUP_START_BASE
+// 给定 roundSeed，生成"组内随机、组间 A→Y"的完整序列
+// 每组用 roundSeed ^ groupIndex 作为子 seed，保证各组独立洗牌
+function buildShuffledSequence(roundSeed: number) {
+  return LEVEL2_GROUPS.flatMap((g, i) => {
+    const entries = g.rows.flatMap(r => r.entries)
+    return shuffle(entries, (roundSeed ^ (i * 2654435761)) >>> 0)
+  })
+}
 
 export default function Level2Page({ onHome }: { onHome?: () => void }) {
   const dispatch = useAppDispatch()
@@ -49,8 +49,19 @@ export default function Level2Page({ onHome }: { onHome?: () => void }) {
       .sort((a, b) => (mastered[a!.char] ?? 0) - (mastered[b!.char] ?? 0)) as { char: string; code: string }[]
   }, [mastered])
 
-  // ── 练习序列：用 roundSeed 洗牌
-  const practiceSequence = useMemo(() => shuffle(ALL_ENTRIES, roundSeed), [roundSeed])
+  // ── 练习序列：组内随机，组间 A→Y
+  const practiceSequence = useMemo(() => buildShuffledSequence(roundSeed), [roundSeed])
+
+  // 各组在洗牌序列中的起始 index（组间顺序固定，只有组内顺序随机）
+  const groupStartInShuffled = useMemo(() => {
+    const map: Record<string, number> = {}
+    let idx = 0
+    for (const { firstKey, size } of GROUP_SIZES) {
+      map[firstKey] = idx
+      idx += size
+    }
+    return map
+  }, [])
 
   const sequence = mode === 'review' ? reviewSequence : practiceSequence
 
@@ -73,7 +84,7 @@ export default function Level2Page({ onHome }: { onHome?: () => void }) {
   const [showResult, setShowResult] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const ROUND_SIZE = ALL_ENTRIES.length  // 一轮 = 打完全部 616 个字
+  const ROUND_SIZE = practiceSequence.length  // 一轮 = 打完全部 616 个字
 
   // 完成一轮检测（仅 practice 模式）
   const prevIndexRef = useRef(currentIndex)
@@ -160,9 +171,8 @@ export default function Level2Page({ onHome }: { onHome?: () => void }) {
   const jumpToGroup = (firstKey: string) => {
     setSelectedGroup(firstKey)
     if (mode === 'practice') {
-      // 找到洗牌后该首键第一个出现的位置
-      const idx = practiceSequence.findIndex(e => e.code[0] === firstKey)
-      if (idx >= 0) dispatch(jumpTo({ lesson: 'level2', index: idx }))
+      const idx = groupStartInShuffled[firstKey] ?? 0
+      dispatch(jumpTo({ lesson: 'level2', index: idx }))
     }
     setInputBuffer('')
     setTimeout(() => inputRef.current?.focus(), 50)
