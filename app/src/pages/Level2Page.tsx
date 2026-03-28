@@ -1,16 +1,23 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { LEVEL2_GROUPS } from '../data/level2Groups'
 import type { Level2Group } from '../data/level2Groups'
+import { LEVEL2 } from '../data/level2'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
-import { advance, recordMistake, resetLesson } from '../store/progressSlice'
+import { advance, recordMistake, resetLesson, jumpTo } from '../store/progressSlice'
+import ResultPage from './ResultPage'
+import type { MistakeEntry } from './ResultPage'
+import { shuffle } from '../utils/shuffle'
 
-// 把所有组的所有 entry 展开成一个练习序列，按组顺序
-const PRACTICE_SEQUENCE = LEVEL2_GROUPS.flatMap(g =>
-  g.rows.flatMap(r => r.entries)
-)
+type InputState = 'idle' | 'correct' | 'wrong'
+type Mode = 'practice' | 'review'
 
-// 每组的起始 index，方便跳转
-const GROUP_START: Record<string, number> = (() => {
+const KB_ROW_ORDER = ['gfdsa', 'hjklm', 'trewq', 'yuiop', 'nbvcx']
+
+// 展开完整序列（用于随机打乱）
+const ALL_ENTRIES = LEVEL2_GROUPS.flatMap(g => g.rows.flatMap(r => r.entries))
+
+// 原始分组起始 index（备用，当前 practice 模式用洗牌后位置）
+const _GROUP_START_BASE: Record<string, number> = (() => {
   const map: Record<string, number> = {}
   let idx = 0
   for (const g of LEVEL2_GROUPS) {
@@ -19,119 +26,204 @@ const GROUP_START: Record<string, number> = (() => {
   }
   return map
 })()
+void _GROUP_START_BASE
 
-type InputState = 'idle' | 'correct' | 'wrong'
-
-// 键盘行顺序（用于 rowKeys 排序展示）
-const KB_ROW_ORDER = ['gfdsa', 'hjklm', 'trewq', 'yuiop', 'nbvcx']
-
-export default function Level2Page() {
+export default function Level2Page({ onHome }: { onHome?: () => void }) {
   const dispatch = useAppDispatch()
-  const { currentIndex, correct, mistakes } = useAppSelector(
+  const { currentIndex, correct, mistakes, roundSeed, mastered } = useAppSelector(
     s => s.progress.lessons.level2
   )
 
-  const safeIndex = currentIndex % PRACTICE_SEQUENCE.length
-  const current = PRACTICE_SEQUENCE[safeIndex]
+  const [mode, setMode] = useState<Mode>('practice')
 
-  // 当前第一键是哪个分组
-  const currentGroup: Level2Group = LEVEL2_GROUPS.find(
-    g => g.firstKey === current.code[0]
-  )!
+  // ── 复习序列：从 mastered 里取，按 mastered 次数从少到多（薄弱优先）
+  const reviewSequence = useMemo(() => {
+    const masteredChars = Object.keys(mastered)
+    if (masteredChars.length === 0) return []
+    return masteredChars
+      .map(char => {
+        const entry = LEVEL2.find(e => e.char === char)
+        return entry ? { char: entry.char, code: entry.code } : null
+      })
+      .filter(Boolean)
+      .sort((a, b) => (mastered[a!.char] ?? 0) - (mastered[b!.char] ?? 0)) as { char: string; code: string }[]
+  }, [mastered])
+
+  // ── 练习序列：用 roundSeed 洗牌
+  const practiceSequence = useMemo(() => shuffle(ALL_ENTRIES, roundSeed), [roundSeed])
+
+  const sequence = mode === 'review' ? reviewSequence : practiceSequence
+
+  const [reviewIndex, setReviewIndex] = useState(0)
+  const activeIndex = mode === 'review' ? reviewIndex : currentIndex
+  const safeIndex = sequence.length > 0 ? activeIndex % sequence.length : 0
+  const current = sequence[safeIndex]
+
+  const currentGroup: Level2Group | undefined = current
+    ? LEVEL2_GROUPS.find(g => g.firstKey === current.code[0])
+    : undefined
 
   const [inputBuffer, setInputBuffer] = useState('')
   const [inputState, setInputState] = useState<InputState>('idle')
   const [shake, setShake] = useState(false)
-  // 选中的分组（用于侧边栏高亮），初始跟着 currentIndex
-  const [selectedGroup, setSelectedGroup] = useState(currentGroup.firstKey)
+  const [selectedGroup, setSelectedGroup] = useState(currentGroup?.firstKey ?? 'a')
+  const [roundMistakes, setRoundMistakes] = useState<Record<string, { code: string; count: number }>>({})
+  const [roundCorrect, setRoundCorrect] = useState(0)
+  const [roundMistakeCount, setRoundMistakeCount] = useState(0)
+  const [showResult, setShowResult] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const ROUND_SIZE = ALL_ENTRIES.length  // 一轮 = 打完全部 616 个字
+
+  // 完成一轮检测（仅 practice 模式）
+  const prevIndexRef = useRef(currentIndex)
+  useEffect(() => {
+    if (mode !== 'practice') return
+    const prev = prevIndexRef.current
+    prevIndexRef.current = currentIndex
+    if (Math.floor(prev / ROUND_SIZE) < Math.floor(currentIndex / ROUND_SIZE) && currentIndex > 0) {
+      setShowResult(true)
+    }
+  }, [currentIndex, mode, ROUND_SIZE])
 
   useEffect(() => {
     inputRef.current?.focus()
   }, [safeIndex])
 
-  // 当 currentGroup 变化时同步侧边栏
   useEffect(() => {
-    setSelectedGroup(currentGroup.firstKey)
-  }, [currentGroup.firstKey])
+    if (currentGroup) setSelectedGroup(currentGroup.firstKey)
+  }, [currentGroup?.firstKey])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (!current) return
       const key = e.key.toLowerCase()
       if (!/^[a-z]$/.test(key)) return
 
       const newBuffer = inputBuffer + key
       setInputBuffer(newBuffer)
 
+      const recordErr = () => {
+        setInputState('wrong')
+        setShake(true)
+        dispatch(recordMistake({ lesson: 'level2' }))
+        setRoundMistakeCount(c => c + 1)
+        setRoundMistakes(prev => ({
+          ...prev,
+          [current.char]: { code: current.code, count: (prev[current.char]?.count ?? 0) + 1 },
+        }))
+        setTimeout(() => { setInputState('idle'); setShake(false); setInputBuffer('') }, 400)
+      }
+
       if (newBuffer.length === 1) {
-        // 第一键：检查是否和当前字第一键一致
-        if (key !== current.code[0]) {
-          setInputState('wrong')
-          setShake(true)
-          dispatch(recordMistake({ lesson: 'level2' }))
-          setTimeout(() => {
-            setInputState('idle')
-            setShake(false)
-            setInputBuffer('')
-          }, 400)
-        }
-        // 第一键正确，等第二键
+        if (key !== current.code[0]) { recordErr(); return }
       } else if (newBuffer.length === 2) {
-        if (newBuffer === current.code) {
-          // 全对
-          setInputState('correct')
-          dispatch(advance({ lesson: 'level2', char: current.char }))
-          setTimeout(() => {
-            setInputState('idle')
-            setInputBuffer('')
-          }, 200)
+        if (newBuffer !== current.code) { recordErr(); return }
+        // 正确
+        setInputState('correct')
+        if (mode === 'review') {
+          setReviewIndex(i => i + 1)
         } else {
-          setInputState('wrong')
-          setShake(true)
-          dispatch(recordMistake({ lesson: 'level2' }))
-          setTimeout(() => {
-            setInputState('idle')
-            setShake(false)
-            setInputBuffer('')
-          }, 400)
+          const isLast = (currentIndex + 1) % ROUND_SIZE === 0
+          dispatch(advance({ lesson: 'level2', char: current.char, newRound: isLast }))
         }
+        setRoundCorrect(c => c + 1)
+        setTimeout(() => { setInputState('idle'); setInputBuffer('') }, 200)
       }
     },
-    [inputBuffer, current, dispatch]
+    [inputBuffer, current, currentIndex, mode, ROUND_SIZE, dispatch]
   )
 
-  const accuracy =
-    correct + mistakes > 0
-      ? Math.round((correct / (correct + mistakes)) * 100)
-      : 100
+  const accuracy = correct + mistakes > 0
+    ? Math.round((correct / (correct + mistakes)) * 100) : 100
+  const round = Math.floor(currentIndex / ROUND_SIZE) + 1
 
-  const round = Math.floor(currentIndex / PRACTICE_SEQUENCE.length) + 1
+  const handleReset = () => {
+    dispatch(resetLesson({ lesson: 'level2' }))
+    setInputBuffer('')
+    setRoundMistakes({})
+    setRoundCorrect(0)
+    setRoundMistakeCount(0)
+    setShowResult(false)
+    setReviewIndex(0)
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
 
-  // 跳到某个分组
+  const handleRetry = () => {
+    setRoundMistakes({})
+    setRoundCorrect(0)
+    setRoundMistakeCount(0)
+    setShowResult(false)
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
   const jumpToGroup = (firstKey: string) => {
     setSelectedGroup(firstKey)
-    // 用 jumpTo action 跳到该组起始 index
-    dispatch({ type: 'progress/jumpTo', payload: { lesson: 'level2', index: GROUP_START[firstKey] } })
+    if (mode === 'practice') {
+      // 找到洗牌后该首键第一个出现的位置
+      const idx = practiceSequence.findIndex(e => e.code[0] === firstKey)
+      if (idx >= 0) dispatch(jumpTo({ lesson: 'level2', index: idx }))
+    }
     setInputBuffer('')
     setTimeout(() => inputRef.current?.focus(), 50)
   }
 
-  // 当前显示的分组（侧边栏选中的，不一定是正在打的）
   const displayGroup = LEVEL2_GROUPS.find(g => g.firstKey === selectedGroup)!
+
+  if (showResult) {
+    const mistakeList: MistakeEntry[] = Object.entries(roundMistakes)
+      .map(([text, { code, count }]) => ({ text, code, wrongCount: count }))
+      .sort((a, b) => b.wrongCount - a.wrongCount)
+    return (
+      <ResultPage
+        result={{ mode: 'level2', correct: roundCorrect, mistakes: roundMistakeCount, mistakeList }}
+        onRetry={handleRetry}
+        onHome={onHome ?? (() => setShowResult(false))}
+      />
+    )
+  }
+
+  // 复习模式空状态
+  if (mode === 'review' && reviewSequence.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center justify-center gap-4">
+        <div className="text-4xl">📭</div>
+        <p className="text-gray-400">还没有练习记录，先去练习模式打几个字吧！</p>
+        <button onClick={() => setMode('practice')} className="px-4 py-2 rounded-lg bg-sky-500 text-white font-medium hover:bg-sky-400 transition-colors">
+          去练习
+        </button>
+      </div>
+    )
+  }
+
+  if (!current) return null
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center px-4 py-8 gap-6 select-none">
       {/* 标题 + 统计 */}
       <div className="w-full max-w-3xl flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-widest text-amber-400">二级简码练习</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold tracking-widest text-sky-400">二级简码</h1>
+          {/* 模式切换 */}
+          <div className="flex rounded-lg overflow-hidden border border-gray-700 text-xs">
+            {(['practice', 'review'] as Mode[]).map(m => (
+              <button
+                key={m}
+                onClick={() => { setMode(m); setInputBuffer(''); setReviewIndex(0) }}
+                className={`px-3 py-1 font-medium transition-colors ${
+                  mode === m ? 'bg-sky-500 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
+                }`}
+              >
+                {m === 'practice' ? '练习' : `复习 (${reviewSequence.length})`}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex gap-4 text-sm text-gray-400">
-          <span>第 <span className="text-white font-semibold">{round}</span> 轮</span>
-          <span>{safeIndex + 1} / {PRACTICE_SEQUENCE.length}</span>
+          {mode === 'practice' && <span>第 <span className="text-white font-semibold">{round}</span> 轮</span>}
+          <span>{safeIndex + 1} / {sequence.length}</span>
           <span>正确率 <span className={`font-semibold ${accuracy >= 90 ? 'text-green-400' : accuracy >= 70 ? 'text-yellow-400' : 'text-red-400'}`}>{accuracy}%</span></span>
-          <button
-            onClick={() => { dispatch(resetLesson({ lesson: 'level2' })); setInputBuffer('') }}
-            className="text-gray-500 hover:text-gray-300 transition-colors"
-          >重置</button>
+          <button onClick={handleReset} className="text-gray-500 hover:text-gray-300 transition-colors">重置</button>
         </div>
       </div>
 
@@ -145,10 +237,10 @@ export default function Level2Page() {
               onClick={() => jumpToGroup(g.firstKey)}
               className={`
                 w-10 h-8 rounded text-sm font-mono font-bold transition-all
-                ${g.firstKey === currentGroup.firstKey
-                  ? 'bg-amber-400 text-gray-900'
+                ${g.firstKey === currentGroup?.firstKey
+                  ? 'bg-sky-500 text-white'
                   : g.firstKey === selectedGroup
-                    ? 'bg-gray-700 text-amber-300 ring-1 ring-amber-400'
+                    ? 'bg-gray-700 text-sky-300 ring-1 ring-sky-400'
                     : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
                 }
               `}
@@ -158,62 +250,43 @@ export default function Level2Page() {
           ))}
         </div>
 
-        {/* 右侧：主内容区 */}
+        {/* 右侧 */}
         <div className="flex-1 flex flex-col gap-4">
-          {/* 当前大字展示 */}
-          <div
-            className={`
-              flex flex-col items-center justify-center py-6
-              rounded-xl border transition-all duration-150
-              ${inputState === 'correct'
-                ? 'border-green-400 bg-green-400/5'
-                : inputState === 'wrong'
-                  ? 'border-red-400 bg-red-400/5'
-                  : 'border-gray-800 bg-gray-900'
-              }
-              ${shake ? '[animation:shake_0.35s_ease-in-out]' : ''}
-            `}
-          >
+          {/* 当前大字 */}
+          <div className={`
+            flex flex-col items-center justify-center py-6 rounded-xl border transition-all duration-150
+            ${inputState === 'correct' ? 'border-green-400 bg-green-400/5'
+              : inputState === 'wrong' ? 'border-red-400 bg-red-400/5'
+              : mode === 'review' ? 'border-sky-400/30 bg-sky-400/5' : 'border-gray-800 bg-gray-900'}
+            ${shake ? '[animation:shake_0.35s_ease-in-out]' : ''}
+          `}>
+            {mode === 'review' && (
+              <div className="text-xs text-sky-400 mb-2 font-medium">
+                复习 · 练过 {mastered[current.char] ?? 0} 次
+              </div>
+            )}
             <div className={`text-7xl font-bold transition-colors duration-150 ${
               inputState === 'correct' ? 'text-green-400'
-                : inputState === 'wrong' ? 'text-red-400'
-                : 'text-white'
-            }`}>
-              {current.char}
-            </div>
-            {/* 编码提示：第一键 + 第二键分色 */}
+                : inputState === 'wrong' ? 'text-red-400' : 'text-white'
+            }`}>{current.char}</div>
             <div className="mt-2 flex gap-1 text-2xl font-mono tracking-widest">
-              <span className={`
-                px-2 py-0.5 rounded
-                ${inputBuffer.length >= 1
-                  ? inputBuffer[0] === current.code[0]
-                    ? 'text-green-400 bg-green-400/10'
-                    : 'text-red-400 bg-red-400/10'
-                  : 'text-amber-300'
-                }
-              `}>
-                {current.code[0].toUpperCase()}
-              </span>
-              <span className={`
-                px-2 py-0.5 rounded
-                ${inputBuffer.length >= 2
-                  ? inputBuffer[1] === current.code[1]
-                    ? 'text-green-400 bg-green-400/10'
-                    : 'text-red-400 bg-red-400/10'
-                  : inputBuffer.length === 1
-                    ? 'text-amber-200 animate-pulse'
-                    : 'text-gray-500'
-                }
-              `}>
-                {current.code[1].toUpperCase()}
-              </span>
+              {[0, 1].map(i => (
+                <span key={i} className={`px-2 py-0.5 rounded ${
+                  inputBuffer.length > i
+                    ? inputBuffer[i] === current.code[i] ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'
+                    : inputBuffer.length === i ? 'text-amber-300 animate-pulse bg-amber-400/10' : 'text-gray-500'
+                }`}>
+                  {current.code[i].toUpperCase()}
+                </span>
+              ))}
             </div>
           </div>
 
-          {/* 当前分组码表 */}
+          {/* 分组码表 */}
           <div className="rounded-xl border border-gray-800 bg-gray-900 p-4">
             <div className="text-xs text-gray-500 mb-3 font-mono">
               {displayGroup.firstKey.toUpperCase()} 组 — {displayGroup.rows.reduce((s, r) => s + r.entries.length, 0)} 个字
+              {mode === 'practice' && <span className="ml-2 text-sky-400/60">随机顺序</span>}
             </div>
             <div className="flex flex-col gap-3">
               {KB_ROW_ORDER
@@ -222,29 +295,24 @@ export default function Level2Page() {
                   const row = displayGroup.rows.find(r => r.rowKeys === rk)!
                   return (
                     <div key={rk} className="flex flex-wrap gap-2 items-center">
-                      <span className="text-xs text-gray-600 font-mono w-14 shrink-0">
-                        {rk.toUpperCase()}
-                      </span>
+                      <span className="text-xs text-gray-600 font-mono w-14 shrink-0">{rk.toUpperCase()}</span>
                       {row.entries.map(entry => {
                         const isActive = entry.code === current.code
+                        const isMastered = !!mastered[entry.char]
                         return (
-                          <div
-                            key={entry.code}
-                            className={`
-                              flex flex-col items-center px-2 py-1 rounded min-w-[2.5rem]
-                              transition-all duration-100
-                              ${isActive
-                                ? inputState === 'correct'
-                                  ? 'bg-green-400/20 ring-1 ring-green-400 scale-110'
-                                  : inputState === 'wrong'
-                                    ? 'bg-red-400/20 ring-1 ring-red-400'
-                                    : 'bg-amber-400/15 ring-1 ring-amber-400 scale-105'
-                                : 'bg-gray-800 hover:bg-gray-700'
-                              }
-                            `}
-                          >
-                            <span className="text-base font-bold leading-tight">{entry.char}</span>
-                            <span className={`text-xs font-mono ${isActive ? 'text-amber-300' : 'text-gray-500'}`}>
+                          <div key={entry.code} className={`
+                            flex flex-col items-center px-2 py-1 rounded min-w-[2.5rem] transition-all duration-100
+                            ${isActive
+                              ? inputState === 'correct' ? 'bg-green-400/20 ring-1 ring-green-400 scale-110'
+                                : inputState === 'wrong' ? 'bg-red-400/20 ring-1 ring-red-400'
+                                : 'bg-sky-400/15 ring-1 ring-sky-400 scale-105'
+                              : isMastered ? 'bg-gray-800/60' : 'bg-gray-800 hover:bg-gray-700'
+                            }
+                          `}>
+                            <span className={`text-base font-bold leading-tight ${isMastered && !isActive ? 'text-gray-500' : 'text-white'}`}>
+                              {entry.char}
+                            </span>
+                            <span className={`text-xs font-mono ${isActive ? 'text-sky-300' : 'text-gray-500'}`}>
                               {entry.code.toUpperCase()}
                             </span>
                           </div>
@@ -258,15 +326,10 @@ export default function Level2Page() {
         </div>
       </div>
 
-      {/* 隐藏 input */}
-      <input
-        ref={inputRef}
-        className="opacity-0 absolute w-0 h-0"
-        onKeyDown={handleKeyDown}
-        readOnly
-        autoFocus
-      />
-      <p className="text-gray-600 text-xs">依次按下两个键位继续 · 点击左侧字母切换分组</p>
+      <input ref={inputRef} className="opacity-0 absolute w-0 h-0" onKeyDown={handleKeyDown} readOnly autoFocus />
+      <p className="text-gray-600 text-xs">
+        {mode === 'practice' ? '随机顺序 · 依次按下两键' : '复习薄弱字 · 按掌握次数从少到多排列'}
+      </p>
     </div>
   )
 }

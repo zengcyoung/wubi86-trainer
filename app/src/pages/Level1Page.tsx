@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { LEVEL1 } from '../data/level1'
 import { LEVEL1_ROWS } from '../data/keyboard'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { advance, recordMistake, resetLesson } from '../store/progressSlice'
 import ResultPage from './ResultPage'
 import type { RoundResult, MistakeEntry } from './ResultPage'
+import { shuffle } from '../utils/shuffle'
 
-const PRACTICE_SEQUENCE = LEVEL1_ROWS.flatMap(row =>
+const BASE_SEQUENCE = LEVEL1_ROWS.flatMap(row =>
   row.keys.map(key => {
     const entry = LEVEL1.find(e => e.key === key)!
     return { key, char: entry.char }
@@ -17,31 +18,31 @@ type InputState = 'idle' | 'correct' | 'wrong'
 
 export default function Level1Page({ onHome }: { onHome?: () => void }) {
   const dispatch = useAppDispatch()
-  const { currentIndex, correct, mistakes } = useAppSelector(
+  const { currentIndex, correct, mistakes, roundSeed } = useAppSelector(
     s => s.progress.lessons.level1
   )
 
-  const safeIndex = currentIndex % PRACTICE_SEQUENCE.length
-  const current = PRACTICE_SEQUENCE[safeIndex]
+  // 用 roundSeed 洗牌，同一轮顺序固定，换轮自动换序
+  const sequence = useMemo(() => shuffle(BASE_SEQUENCE, roundSeed), [roundSeed])
+
+  const safeIndex = currentIndex % sequence.length
+  const current = sequence[safeIndex]
   const [inputState, setInputState] = useState<InputState>('idle')
   const [shake, setShake] = useState(false)
-  // 本轮错误记录：char → wrongCount
   const [roundMistakes, setRoundMistakes] = useState<Record<string, number>>({})
   const [showResult, setShowResult] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // 检测是否完成一轮（回到 index 0 且打过至少一轮）
   const prevIndexRef = useRef(currentIndex)
   useEffect(() => {
     const prev = prevIndexRef.current
     prevIndexRef.current = currentIndex
-    // 从最后一个跨越到下一轮时触发结算
-    if (prev % PRACTICE_SEQUENCE.length === PRACTICE_SEQUENCE.length - 1
-      && currentIndex % PRACTICE_SEQUENCE.length === 0
+    if (prev % sequence.length === sequence.length - 1
+      && currentIndex % sequence.length === 0
       && currentIndex > 0) {
       setShowResult(true)
     }
-  }, [currentIndex])
+  }, [currentIndex, sequence.length])
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -49,6 +50,7 @@ export default function Level1Page({ onHome }: { onHome?: () => void }) {
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     const key = e.key.toLowerCase()
+    const isLast = safeIndex === sequence.length - 1
     if (key !== current.key) {
       setInputState('wrong')
       setShake(true)
@@ -58,18 +60,18 @@ export default function Level1Page({ onHome }: { onHome?: () => void }) {
       return
     }
     setInputState('correct')
-    dispatch(advance({ lesson: 'level1', char: current.char }))
+    dispatch(advance({ lesson: 'level1', char: current.char, newRound: isLast }))
     setTimeout(() => setInputState('idle'), 200)
-  }, [current, dispatch])
+  }, [current, safeIndex, sequence.length, dispatch])
 
   const accuracy = correct + mistakes > 0
     ? Math.round((correct / (correct + mistakes)) * 100) : 100
-  const round = Math.floor(currentIndex / PRACTICE_SEQUENCE.length) + 1
+  const round = Math.floor(currentIndex / sequence.length) + 1
 
   const buildResult = (): RoundResult => {
     const mistakeList: MistakeEntry[] = Object.entries(roundMistakes)
       .map(([text, wrongCount]) => {
-        const entry = PRACTICE_SEQUENCE.find(e => e.char === text)
+        const entry = sequence.find(e => e.char === text)
         return { text, code: entry?.key ?? '?', wrongCount }
       })
       .sort((a, b) => b.wrongCount - a.wrongCount)
@@ -88,7 +90,7 @@ export default function Level1Page({ onHome }: { onHome?: () => void }) {
       <ResultPage
         result={buildResult()}
         onRetry={handleRetry}
-        onNext={() => { setShowResult(false); /* 可跳到 level2 */ }}
+        onNext={() => setShowResult(false)}
         onHome={onHome ?? (() => setShowResult(false))}
       />
     )
@@ -102,10 +104,7 @@ export default function Level1Page({ onHome }: { onHome?: () => void }) {
         <span>第 <span className="text-white font-semibold">{round}</span> 轮</span>
         <span>进度 <span className="text-white font-semibold">{safeIndex + 1}</span>/25</span>
         <span>正确率 <span className={`font-semibold ${accuracy >= 90 ? 'text-green-400' : accuracy >= 70 ? 'text-yellow-400' : 'text-red-400'}`}>{accuracy}%</span></span>
-        <button
-          onClick={handleRetry}
-          className="text-gray-500 hover:text-gray-300 transition-colors"
-        >重置</button>
+        <button onClick={handleRetry} className="text-gray-500 hover:text-gray-300 transition-colors">重置</button>
       </div>
 
       <div className="w-full max-w-xl flex flex-col gap-3">
@@ -115,21 +114,14 @@ export default function Level1Page({ onHome }: { onHome?: () => void }) {
               const entry = LEVEL1.find(e => e.key === key)!
               const isActive = key === current.key
               return (
-                <div
-                  key={key}
-                  className={`
-                    flex flex-col items-center justify-center
-                    w-16 h-16 rounded-lg border text-center transition-all duration-150
-                    ${isActive
-                      ? inputState === 'correct'
-                        ? 'border-green-400 bg-green-400/10 scale-110'
-                        : inputState === 'wrong'
-                          ? 'border-red-400 bg-red-400/10'
-                          : 'border-amber-400 bg-amber-400/10 scale-105'
-                      : 'border-gray-700 bg-gray-900'
-                    }
-                  `}
-                >
+                <div key={key} className={`
+                  flex flex-col items-center justify-center w-16 h-16 rounded-lg border text-center transition-all duration-150
+                  ${isActive
+                    ? inputState === 'correct' ? 'border-green-400 bg-green-400/10 scale-110'
+                      : inputState === 'wrong' ? 'border-red-400 bg-red-400/10'
+                      : 'border-amber-400 bg-amber-400/10 scale-105'
+                    : 'border-gray-700 bg-gray-900'}
+                `}>
                   <span className="text-xl font-bold leading-none">{entry.char}</span>
                   <span className={`text-xs mt-1 font-mono ${isActive ? 'text-amber-300' : 'text-gray-500'}`}>
                     {key.toUpperCase()}
@@ -149,7 +141,7 @@ export default function Level1Page({ onHome }: { onHome?: () => void }) {
       </div>
 
       <input ref={inputRef} className="opacity-0 absolute w-0 h-0" onKeyDown={handleKeyDown} readOnly autoFocus />
-      <p className="text-gray-600 text-sm">按下对应键位继续 · 完成一轮后显示结算</p>
+      <p className="text-gray-600 text-sm">随机顺序 · 完成一轮后显示结算</p>
     </div>
   )
 }
