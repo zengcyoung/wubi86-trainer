@@ -1,5 +1,7 @@
-import { useAppSelector } from '../store/hooks'
+import { useState } from 'react'
+import { useAppSelector, useAppDispatch } from '../store/hooks'
 import type { LessonKey } from '../store/progressSlice'
+import { resetLesson, resetArticleSession } from '../store/progressSlice'
 import { LEVEL1 } from '../data/level1'
 import { PHRASES_TIER1 } from '../data/phrases'
 
@@ -193,7 +195,18 @@ function StatBar({ label, value, sub }: { label: string; value: string | number;
 }
 
 export default function HomePage({ onNavigate }: { onNavigate: (page: 'level1' | 'level2' | 'phrase' | 'article') => void }) {
+  const dispatch = useAppDispatch()
   const progress = useAppSelector(s => s.progress.lessons)
+
+  const [confirmReset, setConfirmReset] = useState(false)
+
+  const handleResetAll = () => {
+    ;(['level1', 'level2', 'phrase', 'article'] as LessonKey[]).forEach(k =>
+      dispatch(resetLesson({ lesson: k }))
+    )
+    dispatch(resetArticleSession())
+    setConfirmReset(false)
+  }
 
   const level1Mastered = Object.keys(progress.level1.mastered).length
   const level2Mastered = Object.keys(progress.level2.mastered).length
@@ -257,8 +270,34 @@ export default function HomePage({ onNavigate }: { onNavigate: (page: 'level1' |
         })}
       </div>
 
-      {/* 底部一句话 */}
-      <p className="text-gray-700 text-xs mt-2">进度自动保存于本地 · 清除浏览器数据会重置</p>
+      {/* 底部：提示 + 重置按钮 */}
+      <div className="flex flex-col items-center gap-2 mt-2">
+        <p className="text-gray-700 text-xs">进度自动保存于本地 · 清除浏览器数据会重置</p>
+        {!confirmReset ? (
+          <button
+            onClick={() => setConfirmReset(true)}
+            className="text-xs text-muted hover:text-red-400 transition-colors"
+          >
+            重置所有进度
+          </button>
+        ) : (
+          <div className="flex items-center gap-3 px-4 py-2 rounded-xl border border-red-400/30 bg-red-400/5">
+            <span className="text-xs text-red-400">确定要清除全部进度吗？此操作不可恢复。</span>
+            <button
+              onClick={handleResetAll}
+              className="text-xs px-2 py-1 rounded-lg bg-red-500 text-white font-medium hover:bg-red-400 transition-colors"
+            >
+              确认重置
+            </button>
+            <button
+              onClick={() => setConfirmReset(false)}
+              className="text-xs text-muted hover:text-primary transition-colors"
+            >
+              取消
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
