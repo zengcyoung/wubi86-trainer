@@ -55,12 +55,12 @@ export default function ResultPage({ result, onRetry, onNext, onHome }: ResultPa
   const seconds = result.durationSeconds ? Math.round(result.durationSeconds % 60) : 0
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center justify-center px-4 py-10 gap-8">
+    <div className="min-h-screen bg-page text-primary flex flex-col items-center justify-center px-4 py-10 gap-8">
       {/* Emoji + 评价 */}
       <div className="flex flex-col items-center gap-2">
         <div className="text-6xl">{rating.emoji}</div>
         <h2 className="text-2xl font-bold text-white">{rating.text}</h2>
-        <div className="text-sm text-gray-500">{MODE_LABEL[result.mode]} · 本轮结算</div>
+        <div className="text-sm text-muted">{MODE_LABEL[result.mode]} · 本轮结算</div>
       </div>
 
       {/* 核心数据 */}
@@ -72,7 +72,7 @@ export default function ResultPage({ result, onRetry, onNext, onHome }: ResultPa
           color={result.mistakes === 0 ? 'text-green-400' : result.mistakes < 5 ? 'text-yellow-400' : 'text-red-400'} />
         {result.wpm !== undefined
           ? <StatCard label="打字速度" value={`${result.wpm}`} unit="字/分" color="text-amber-400" />
-          : <StatCard label="—" value="—" color="text-gray-600" />
+          : <StatCard label="—" value="—" color="text-faint" />
         }
         {result.durationSeconds !== undefined && (
           <StatCard
@@ -86,14 +86,14 @@ export default function ResultPage({ result, onRetry, onNext, onHome }: ResultPa
       {/* 错误回顾 */}
       {result.mistakeList && result.mistakeList.length > 0 && (
         <div className="w-full max-w-sm">
-          <h3 className="text-xs font-semibold text-gray-500 tracking-widest uppercase mb-3">
+          <h3 className="text-xs font-semibold text-muted tracking-widest uppercase mb-3">
             重点回顾（打错 {result.mistakeList.length} 个）
           </h3>
           <div className="flex flex-wrap gap-2">
             {result.mistakeList.slice(0, 20).map(m => (
               <div
                 key={m.text}
-                className="flex flex-col items-center px-3 py-2 rounded-xl bg-gray-900 border border-red-400/20"
+                className="flex flex-col items-center px-3 py-2 rounded-xl bg-card border border-red-400/20"
               >
                 <span className="text-lg font-bold text-white">{m.text}</span>
                 <span className="text-xs font-mono text-amber-300 mt-0.5">{m.code.toUpperCase()}</span>
@@ -124,7 +124,7 @@ export default function ResultPage({ result, onRetry, onNext, onHome }: ResultPa
         )}
         <button
           onClick={onHome}
-          className="flex-1 py-2.5 rounded-xl bg-gray-800 text-gray-300 font-semibold text-sm hover:bg-gray-700 transition-colors"
+          className="flex-1 py-2.5 rounded-xl bg-chip text-secondary font-semibold text-sm hover:bg-chip-hover transition-colors"
         >
           首页
         </button>
@@ -135,12 +135,12 @@ export default function ResultPage({ result, onRetry, onNext, onHome }: ResultPa
 
 function StatCard({ label, value, unit, color }: { label: string; value: string; unit?: string; color: string }) {
   return (
-    <div className="flex flex-col items-center p-4 rounded-2xl bg-gray-900 border border-gray-800">
+    <div className="flex flex-col items-center p-4 rounded-2xl bg-card border border-theme">
       <div className={`text-3xl font-bold tabular-nums ${color}`}>
         {value}
-        {unit && <span className="text-base text-gray-500 ml-1">{unit}</span>}
+        {unit && <span className="text-base text-muted ml-1">{unit}</span>}
       </div>
-      <div className="text-xs text-gray-500 mt-1">{label}</div>
+      <div className="text-xs text-muted mt-1">{label}</div>
     </div>
   )
 }

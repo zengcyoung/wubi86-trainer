@@ -24,11 +24,11 @@ function App() {
 
   return (
     <div>
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center gap-1 px-3 py-2 bg-gray-900/90 backdrop-blur border-b border-gray-800">
+      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center gap-1 px-3 py-2 nav-bg backdrop-blur border-b border-theme">
         <button
           onClick={() => setPage('home')}
           className={`px-2.5 py-1 rounded text-sm font-bold transition-colors ${
-            page === 'home' ? 'text-amber-400' : 'text-gray-600 hover:text-gray-300'
+            page === 'home' ? 'text-amber-400' : 'text-faint hover:text-secondary'
           }`}
           title="首页"
         >
@@ -42,7 +42,7 @@ function App() {
             className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
               page === key
                 ? 'bg-amber-400 text-gray-900'
-                : 'text-gray-400 hover:text-white'
+                : 'text-secondary hover:text-white'
             }`}
           >
             {label}

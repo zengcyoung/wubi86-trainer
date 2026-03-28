@@ -28,7 +28,7 @@ function CodeDisplay({ code, typed, state }: { code: string; typed: string; stat
   return (
     <div className="flex gap-1 font-mono text-2xl tracking-widest">
       {code.split('').map((ch, i) => {
-        let color = 'text-gray-500'
+        let color = 'text-muted'
         if (i < typed.length) {
           color = typed[i] === ch
             ? (state === 'wrong' && i === typed.length - 1 ? 'text-red-400' : 'text-green-400')
@@ -189,9 +189,9 @@ export default function PhrasePage({ onHome }: { onHome?: () => void }) {
 
   if (mode === 'review' && reviewSequence.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center justify-center gap-4">
+      <div className="min-h-screen bg-page text-primary flex flex-col items-center justify-center gap-4">
         <div className="text-4xl">📭</div>
-        <p className="text-gray-400">还没有练习记录，先去练习模式打几个词吧！</p>
+        <p className="text-secondary">还没有练习记录，先去练习模式打几个词吧！</p>
         <button onClick={() => setMode('practice')} className="px-4 py-2 rounded-lg bg-violet-500 text-white font-medium hover:bg-violet-400 transition-colors">
           去练习
         </button>
@@ -207,7 +207,7 @@ export default function PhrasePage({ onHome }: { onHome?: () => void }) {
 
   return (
     <div
-      className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center px-4 py-8 gap-6 select-none"
+      className="min-h-screen bg-page text-primary flex flex-col items-center px-4 py-8 gap-6 select-none"
       onClick={() => inputRef.current?.focus()}
     >
       {/* 标题 + 统计 */}
@@ -215,13 +215,13 @@ export default function PhrasePage({ onHome }: { onHome?: () => void }) {
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold tracking-widest text-violet-400">词组练习</h1>
           {/* 模式切换 */}
-          <div className="flex rounded-lg overflow-hidden border border-gray-700 text-xs">
+          <div className="flex rounded-lg overflow-hidden border border-subtle text-xs">
             {(['practice', 'review'] as Mode[]).map(m => (
               <button
                 key={m}
                 onClick={() => handleModeChange(m)}
                 className={`px-3 py-1 font-medium transition-colors ${
-                  mode === m ? 'bg-violet-500 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
+                  mode === m ? 'bg-violet-500 text-white' : 'bg-chip text-secondary hover:text-white'
                 }`}
               >
                 {m === 'practice' ? '练习' : `复习 (${reviewSequence.length})`}
@@ -229,11 +229,11 @@ export default function PhrasePage({ onHome }: { onHome?: () => void }) {
             ))}
           </div>
         </div>
-        <div className="flex gap-4 text-sm text-gray-400">
+        <div className="flex gap-4 text-sm text-secondary">
           {mode === 'practice' && <span>第 <span className="text-white font-semibold">{round}</span> 轮</span>}
           <span>{safeIndex + 1} / {sequence.length}</span>
           <span>正确率 <span className={`font-semibold ${accuracy >= 90 ? 'text-green-400' : accuracy >= 70 ? 'text-yellow-400' : 'text-red-400'}`}>{accuracy}%</span></span>
-          <button onClick={handleRetry} className="text-gray-500 hover:text-gray-300 transition-colors">重置</button>
+          <button onClick={handleRetry} className="text-muted hover:text-secondary transition-colors">重置</button>
         </div>
       </div>
 
@@ -245,7 +245,7 @@ export default function PhrasePage({ onHome }: { onHome?: () => void }) {
               key={t}
               onClick={() => handleTierChange(t)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                tier === t ? 'bg-violet-500 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                tier === t ? 'bg-violet-500 text-white' : 'bg-chip text-secondary hover:bg-chip-hover hover:text-white'
               }`}
             >
               {TIER_LABELS[t]}
@@ -266,7 +266,7 @@ export default function PhrasePage({ onHome }: { onHome?: () => void }) {
         rounded-2xl border transition-all duration-150
         ${inputState === 'correct' ? 'border-green-400 bg-green-400/5'
           : inputState === 'wrong' ? 'border-red-400 bg-red-400/5'
-          : mode === 'review' ? 'border-violet-400/30 bg-violet-400/5' : 'border-gray-800 bg-gray-900'}
+          : mode === 'review' ? 'border-violet-400/30 bg-violet-400/5' : 'border-theme bg-card'}
         ${shake ? '[animation:shake_0.35s_ease-in-out]' : ''}
       `}>
         {mode === 'review' && (
@@ -280,7 +280,7 @@ export default function PhrasePage({ onHome }: { onHome?: () => void }) {
           {current.text}
         </div>
         <CodeDisplay code={current.code} typed={typed} state={inputState} />
-        <div className="text-xs text-gray-600">
+        <div className="text-xs text-faint">
           {current.wordLen === 2 ? '二字词' : current.wordLen === 3 ? '三字词' : `${current.wordLen}字词`}
           {' · '}weight {current.weight}
         </div>
@@ -296,12 +296,12 @@ export default function PhrasePage({ onHome }: { onHome?: () => void }) {
             <div key={`${absIdx}-${p.code}`} className={`
               flex flex-col items-center px-3 py-1.5 rounded-lg transition-all
               ${isCurrent ? 'bg-violet-400/15 ring-1 ring-violet-400 scale-105'
-                : isPast ? 'bg-gray-800/40 opacity-40' : 'bg-gray-800/60'}
+                : isPast ? 'bg-chip/40 opacity-40' : 'bg-chip/60'}
             `}>
-              <span className={`text-lg font-bold ${isCurrent ? 'text-white' : isPast ? 'text-gray-500' : 'text-gray-300'}`}>
+              <span className={`text-lg font-bold ${isCurrent ? 'text-white' : isPast ? 'text-muted' : 'text-secondary'}`}>
                 {p.text}
               </span>
-              <span className={`text-xs font-mono ${isCurrent ? 'text-violet-300' : 'text-gray-600'}`}>
+              <span className={`text-xs font-mono ${isCurrent ? 'text-violet-300' : 'text-faint'}`}>
                 {p.code.toUpperCase()}
               </span>
             </div>
@@ -310,7 +310,7 @@ export default function PhrasePage({ onHome }: { onHome?: () => void }) {
       </div>
 
       <input ref={inputRef} className="opacity-0 absolute w-0 h-0" onKeyDown={handleKeyDown} readOnly autoFocus />
-      <p className="text-gray-600 text-xs">
+      <p className="text-faint text-xs">
         {mode === 'practice' ? '随机顺序 · 依次按下4键 · 点击页面重新聚焦'
           : '复习薄弱词 · 依次按下4键'}
       </p>

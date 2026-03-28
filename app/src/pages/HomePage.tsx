@@ -125,8 +125,8 @@ function StageCard({
         ${isActive
           ? `${stage.borderColor} ${stage.glowColor} shadow-lg`
           : isComingSoon
-            ? 'border-gray-800 bg-gray-900/40 opacity-60'
-            : 'border-gray-800 bg-gray-900/70 hover:border-gray-700'
+            ? 'border-theme bg-card/40 opacity-60'
+            : 'border-theme bg-card/70 hover:border-subtle'
         }
       `}
     >
@@ -149,13 +149,13 @@ function StageCard({
               </span>
             )}
             {isComingSoon && prevMastered < prevRequired && (
-              <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-700 text-gray-500">
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-chip-hover text-muted">
                 建议先完成上一关
               </span>
             )}
           </div>
-          <div className="text-xs text-gray-500 mb-2">{stage.sublabel}</div>
-          <p className="text-xs text-gray-400 leading-relaxed">{stage.description}</p>
+          <div className="text-xs text-muted mb-2">{stage.sublabel}</div>
+          <p className="text-xs text-secondary leading-relaxed">{stage.description}</p>
         </div>
 
         {/* 右：进度数字 */}
@@ -163,18 +163,18 @@ function StageCard({
           {stage.total > 0 ? (
             <>
               <div className={`text-2xl font-bold tabular-nums ${stage.color}`}>{percent}%</div>
-              <div className="text-xs text-gray-600 mt-0.5">
+              <div className="text-xs text-faint mt-0.5">
                 {masteredCount} / {total}
               </div>
             </>
           ) : (
-            <div className="text-xs text-gray-600 mt-2">即将上线</div>
+            <div className="text-xs text-faint mt-2">即将上线</div>
           )}
         </div>
       </div>
 
       {/* 底部提示（hover 展开） */}
-      <div className="mt-3 pt-3 border-t border-gray-800 text-xs text-gray-500 leading-relaxed group-hover:text-gray-400 transition-colors">
+      <div className="mt-3 pt-3 border-t border-theme text-xs text-muted leading-relaxed group-hover:text-secondary transition-colors">
         💡 {stage.tip}
       </div>
     </button>
@@ -186,8 +186,8 @@ function StatBar({ label, value, sub }: { label: string; value: string | number;
   return (
     <div className="flex flex-col items-center gap-0.5">
       <div className="text-2xl font-bold text-white tabular-nums">{value}</div>
-      <div className="text-xs text-gray-500">{label}</div>
-      {sub && <div className="text-xs text-gray-600">{sub}</div>}
+      <div className="text-xs text-muted">{label}</div>
+      {sub && <div className="text-xs text-faint">{sub}</div>}
     </div>
   )
 }
@@ -221,25 +221,25 @@ export default function HomePage({ onNavigate }: { onNavigate: (page: 'level1' |
           : 'article'
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center px-4 py-10 gap-8">
+    <div className="min-h-screen bg-page text-primary flex flex-col items-center px-4 py-10 gap-8">
       {/* Logo / 标题 */}
       <div className="text-center">
         <h1 className="text-3xl font-bold tracking-widest text-amber-400 mb-1">五笔练习</h1>
-        <p className="text-sm text-gray-500">86 版五笔 · 从入门到飞速</p>
+        <p className="text-sm text-muted">86 版五笔 · 从入门到飞速</p>
       </div>
 
       {/* 总体统计 */}
-      <div className="w-full max-w-lg flex justify-around py-4 px-6 rounded-2xl bg-gray-900 border border-gray-800">
+      <div className="w-full max-w-lg flex justify-around py-4 px-6 rounded-2xl bg-card border border-theme">
         <StatBar label="累计掌握" value={totalMastered} sub="字/词" />
-        <div className="w-px bg-gray-800" />
+        <div className="w-px bg-chip" />
         <StatBar label="综合正确率" value={`${totalAccuracy}%`} />
-        <div className="w-px bg-gray-800" />
+        <div className="w-px bg-chip" />
         <StatBar label="总练习次数" value={totalCorrect + totalMistakes} />
       </div>
 
       {/* 学习路径 */}
       <div className="w-full max-w-lg flex flex-col gap-3">
-        <h2 className="text-xs font-semibold text-gray-500 tracking-widest uppercase px-1">学习路径</h2>
+        <h2 className="text-xs font-semibold text-muted tracking-widest uppercase px-1">学习路径</h2>
         {STAGES.map((stage, i) => {
           const prevStage = i > 0 ? STAGES[i - 1] : null
           const prevMastered = prevStage ? masteredCounts[prevStage.key] : 999

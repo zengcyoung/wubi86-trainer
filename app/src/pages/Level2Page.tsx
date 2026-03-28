@@ -196,9 +196,9 @@ export default function Level2Page({ onHome }: { onHome?: () => void }) {
   // 复习模式空状态
   if (mode === 'review' && reviewSequence.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center justify-center gap-4">
+      <div className="min-h-screen bg-page text-primary flex flex-col items-center justify-center gap-4">
         <div className="text-4xl">📭</div>
-        <p className="text-gray-400">还没有练习记录，先去练习模式打几个字吧！</p>
+        <p className="text-secondary">还没有练习记录，先去练习模式打几个字吧！</p>
         <button onClick={() => setMode('practice')} className="px-4 py-2 rounded-lg bg-sky-500 text-white font-medium hover:bg-sky-400 transition-colors">
           去练习
         </button>
@@ -209,19 +209,19 @@ export default function Level2Page({ onHome }: { onHome?: () => void }) {
   if (!current) return null
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center px-4 py-8 gap-6 select-none">
+    <div className="min-h-screen bg-page text-primary flex flex-col items-center px-4 py-8 gap-6 select-none">
       {/* 标题 + 统计 */}
       <div className="w-full max-w-3xl flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold tracking-widest text-sky-400">二级简码</h1>
           {/* 模式切换 */}
-          <div className="flex rounded-lg overflow-hidden border border-gray-700 text-xs">
+          <div className="flex rounded-lg overflow-hidden border border-subtle text-xs">
             {(['practice', 'review'] as Mode[]).map(m => (
               <button
                 key={m}
                 onClick={() => { setMode(m); setInputBuffer(''); setReviewIndex(0) }}
                 className={`px-3 py-1 font-medium transition-colors ${
-                  mode === m ? 'bg-sky-500 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
+                  mode === m ? 'bg-sky-500 text-white' : 'bg-chip text-secondary hover:text-white'
                 }`}
               >
                 {m === 'practice' ? '练习' : `复习 (${reviewSequence.length})`}
@@ -229,18 +229,18 @@ export default function Level2Page({ onHome }: { onHome?: () => void }) {
             ))}
           </div>
         </div>
-        <div className="flex gap-4 text-sm text-gray-400">
+        <div className="flex gap-4 text-sm text-secondary">
           {mode === 'practice' && <span>第 <span className="text-white font-semibold">{round}</span> 轮</span>}
           <span>{safeIndex + 1} / {sequence.length}</span>
           <span>正确率 <span className={`font-semibold ${accuracy >= 90 ? 'text-green-400' : accuracy >= 70 ? 'text-yellow-400' : 'text-red-400'}`}>{accuracy}%</span></span>
-          <button onClick={handleReset} className="text-gray-500 hover:text-gray-300 transition-colors">重置</button>
+          <button onClick={handleReset} className="text-muted hover:text-secondary transition-colors">重置</button>
         </div>
       </div>
 
       <div className="w-full max-w-3xl flex gap-4">
         {/* 左侧：分组选择器 */}
         <div className="flex flex-col gap-1 shrink-0">
-          <div className="text-xs text-gray-500 mb-1 text-center">分组</div>
+          <div className="text-xs text-muted mb-1 text-center">分组</div>
           {LEVEL2_GROUPS.map(g => (
             <button
               key={g.firstKey}
@@ -250,8 +250,8 @@ export default function Level2Page({ onHome }: { onHome?: () => void }) {
                 ${g.firstKey === currentGroup?.firstKey
                   ? 'bg-sky-500 text-white'
                   : g.firstKey === selectedGroup
-                    ? 'bg-gray-700 text-sky-300 ring-1 ring-sky-400'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                    ? 'bg-chip-hover text-sky-300 ring-1 ring-sky-400'
+                    : 'bg-chip text-secondary hover:bg-chip-hover hover:text-white'
                 }
               `}
             >
@@ -267,7 +267,7 @@ export default function Level2Page({ onHome }: { onHome?: () => void }) {
             flex flex-col items-center justify-center py-6 rounded-xl border transition-all duration-150
             ${inputState === 'correct' ? 'border-green-400 bg-green-400/5'
               : inputState === 'wrong' ? 'border-red-400 bg-red-400/5'
-              : mode === 'review' ? 'border-sky-400/30 bg-sky-400/5' : 'border-gray-800 bg-gray-900'}
+              : mode === 'review' ? 'border-sky-400/30 bg-sky-400/5' : 'border-theme bg-card'}
             ${shake ? '[animation:shake_0.35s_ease-in-out]' : ''}
           `}>
             {mode === 'review' && (
@@ -284,7 +284,7 @@ export default function Level2Page({ onHome }: { onHome?: () => void }) {
                 <span key={i} className={`px-2 py-0.5 rounded ${
                   inputBuffer.length > i
                     ? inputBuffer[i] === current.code[i] ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'
-                    : inputBuffer.length === i ? 'text-amber-300 animate-pulse bg-amber-400/10' : 'text-gray-500'
+                    : inputBuffer.length === i ? 'text-amber-300 animate-pulse bg-amber-400/10' : 'text-muted'
                 }`}>
                   {current.code[i].toUpperCase()}
                 </span>
@@ -293,8 +293,8 @@ export default function Level2Page({ onHome }: { onHome?: () => void }) {
           </div>
 
           {/* 分组码表 */}
-          <div className="rounded-xl border border-gray-800 bg-gray-900 p-4">
-            <div className="text-xs text-gray-500 mb-3 font-mono">
+          <div className="rounded-xl border border-theme bg-card p-4">
+            <div className="text-xs text-muted mb-3 font-mono">
               {displayGroup.firstKey.toUpperCase()} 组 — {displayGroup.rows.reduce((s, r) => s + r.entries.length, 0)} 个字
               {mode === 'practice' && <span className="ml-2 text-sky-400/60">随机顺序</span>}
             </div>
@@ -305,7 +305,7 @@ export default function Level2Page({ onHome }: { onHome?: () => void }) {
                   const row = displayGroup.rows.find(r => r.rowKeys === rk)!
                   return (
                     <div key={rk} className="flex flex-wrap gap-2 items-center">
-                      <span className="text-xs text-gray-600 font-mono w-14 shrink-0">{rk.toUpperCase()}</span>
+                      <span className="text-xs text-faint font-mono w-14 shrink-0">{rk.toUpperCase()}</span>
                       {row.entries.map(entry => {
                         const isActive = entry.code === current.code
                         const isMastered = !!mastered[entry.char]
@@ -316,13 +316,13 @@ export default function Level2Page({ onHome }: { onHome?: () => void }) {
                               ? inputState === 'correct' ? 'bg-green-400/20 ring-1 ring-green-400 scale-110'
                                 : inputState === 'wrong' ? 'bg-red-400/20 ring-1 ring-red-400'
                                 : 'bg-sky-400/15 ring-1 ring-sky-400 scale-105'
-                              : isMastered ? 'bg-gray-800/60' : 'bg-gray-800 hover:bg-gray-700'
+                              : isMastered ? 'bg-chip/60' : 'bg-chip hover:bg-chip-hover'
                             }
                           `}>
-                            <span className={`text-base font-bold leading-tight ${isMastered && !isActive ? 'text-gray-500' : 'text-white'}`}>
+                            <span className={`text-base font-bold leading-tight ${isMastered && !isActive ? 'text-muted' : 'text-white'}`}>
                               {entry.char}
                             </span>
-                            <span className={`text-xs font-mono ${isActive ? 'text-sky-300' : 'text-gray-500'}`}>
+                            <span className={`text-xs font-mono ${isActive ? 'text-sky-300' : 'text-muted'}`}>
                               {entry.code.toUpperCase()}
                             </span>
                           </div>
@@ -337,7 +337,7 @@ export default function Level2Page({ onHome }: { onHome?: () => void }) {
       </div>
 
       <input ref={inputRef} className="opacity-0 absolute w-0 h-0" onKeyDown={handleKeyDown} readOnly autoFocus />
-      <p className="text-gray-600 text-xs">
+      <p className="text-faint text-xs">
         {mode === 'practice' ? '随机顺序 · 依次按下两键' : '复习薄弱字 · 按掌握次数从少到多排列'}
       </p>
     </div>

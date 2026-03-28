@@ -97,14 +97,14 @@ export default function Level1Page({ onHome }: { onHome?: () => void }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center px-4 py-10 gap-8 select-none">
+    <div className="min-h-screen bg-page text-primary flex flex-col items-center px-4 py-10 gap-8 select-none">
       <h1 className="text-2xl font-bold tracking-widest text-amber-400">一级简码练习</h1>
 
-      <div className="flex gap-6 text-sm text-gray-400">
+      <div className="flex gap-6 text-sm text-secondary">
         <span>第 <span className="text-white font-semibold">{round}</span> 轮</span>
         <span>进度 <span className="text-white font-semibold">{safeIndex + 1}</span>/25</span>
         <span>正确率 <span className={`font-semibold ${accuracy >= 90 ? 'text-green-400' : accuracy >= 70 ? 'text-yellow-400' : 'text-red-400'}`}>{accuracy}%</span></span>
-        <button onClick={handleRetry} className="text-gray-500 hover:text-gray-300 transition-colors">重置</button>
+        <button onClick={handleRetry} className="text-muted hover:text-secondary transition-colors">重置</button>
       </div>
 
       <div className="w-full max-w-xl flex flex-col gap-3">
@@ -120,10 +120,10 @@ export default function Level1Page({ onHome }: { onHome?: () => void }) {
                     ? inputState === 'correct' ? 'border-green-400 bg-green-400/10 scale-110'
                       : inputState === 'wrong' ? 'border-red-400 bg-red-400/10'
                       : 'border-amber-400 bg-amber-400/10 scale-105'
-                    : 'border-gray-700 bg-gray-900'}
+                    : 'border-subtle bg-card'}
                 `}>
                   <span className="text-xl font-bold leading-none">{entry.char}</span>
-                  <span className={`text-xs mt-1 font-mono ${isActive ? 'text-amber-300' : 'text-gray-500'}`}>
+                  <span className={`text-xs mt-1 font-mono ${isActive ? 'text-amber-300' : 'text-muted'}`}>
                     {key.toUpperCase()}
                   </span>
                 </div>
@@ -141,7 +141,7 @@ export default function Level1Page({ onHome }: { onHome?: () => void }) {
       </div>
 
       <input ref={inputRef} className="opacity-0 absolute w-0 h-0" onKeyDown={handleKeyDown} readOnly autoFocus />
-      <p className="text-gray-600 text-sm">随机顺序 · 完成一轮后显示结算</p>
+      <p className="text-faint text-sm">随机顺序 · 完成一轮后显示结算</p>
     </div>
   )
 }

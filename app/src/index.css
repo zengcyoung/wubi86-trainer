@@ -1,5 +1,77 @@
 @import "tailwindcss";
 
+/* ── 颜色变量：暗色（默认） ───────────────────────────────────────────────── */
+:root {
+  --bg-page:        #030712;   /* gray-950 */
+  --bg-card:        #111827;   /* gray-900 */
+  --bg-card-hover:  #1f2937;   /* gray-800 */
+  --bg-chip:        #1f2937;   /* gray-800 */
+  --bg-chip-hover:  #374151;   /* gray-700 */
+
+  --border:         #1f2937;   /* gray-800 */
+  --border-subtle:  #374151;   /* gray-700 */
+
+  --text-primary:   #f9fafb;   /* gray-50 */
+  --text-secondary: #9ca3af;   /* gray-400 */
+  --text-muted:     #6b7280;   /* gray-500 */
+  --text-faint:     #374151;   /* gray-700 */
+
+  --nav-bg:         rgba(17,24,39,0.90);   /* gray-900/90 */
+
+  color-scheme: dark;
+}
+
+/* ── 颜色变量：亮色 ──────────────────────────────────────────────────────── */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg-page:        #f9fafb;   /* gray-50 */
+    --bg-card:        #ffffff;
+    --bg-card-hover:  #f3f4f6;   /* gray-100 */
+    --bg-chip:        #f3f4f6;   /* gray-100 */
+    --bg-chip-hover:  #e5e7eb;   /* gray-200 */
+
+    --border:         #e5e7eb;   /* gray-200 */
+    --border-subtle:  #d1d5db;   /* gray-300 */
+
+    --text-primary:   #111827;   /* gray-900 */
+    --text-secondary: #4b5563;   /* gray-600 */
+    --text-muted:     #6b7280;   /* gray-500 */
+    --text-faint:     #d1d5db;   /* gray-300 */
+
+    --nav-bg:         rgba(249,250,251,0.92);
+
+    color-scheme: light;
+  }
+}
+
+/* ── 全局基础样式 ─────────────────────────────────────────────────────────── */
+body {
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* ── Tailwind 实用类覆写：让常用的 bg/text/border 类响应变量 ─────────────── */
+/* 页面背景 */
+.bg-page        { background-color: var(--bg-page); }
+.bg-card        { background-color: var(--bg-card); }
+.bg-chip        { background-color: var(--bg-chip); }
+.bg-chip-hover:hover { background-color: var(--bg-chip-hover); }
+
+/* 文字 */
+.text-primary   { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted     { color: var(--text-muted); }
+.text-faint     { color: var(--text-faint); }
+
+/* 边框 */
+.border-theme   { border-color: var(--border); }
+.border-subtle  { border-color: var(--border-subtle); }
+
+/* 导航栏背景 */
+.nav-bg         { background-color: var(--nav-bg); }
+
+/* ── 动画 ────────────────────────────────────────────────────────────────── */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   20%       { transform: translateX(-8px); }
