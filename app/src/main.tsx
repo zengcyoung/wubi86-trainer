@@ -7,14 +7,16 @@ import HomePage from './pages/HomePage'
 import Level1Page from './pages/Level1Page'
 import Level2Page from './pages/Level2Page'
 import PhrasePage from './pages/PhrasePage'
+import ArticlePage from './pages/ArticlePage'
 import './index.css'
 
 export type Page = 'home' | 'level1' | 'level2' | 'phrase' | 'article'
 
-const NAV_ITEMS: { key: Exclude<Page, 'home' | 'article'>; label: string }[] = [
+const NAV_ITEMS: { key: Exclude<Page, 'home'>; label: string }[] = [
   { key: 'level1', label: '一级简码' },
   { key: 'level2', label: '二级简码' },
   { key: 'phrase', label: '词组练习' },
+  { key: 'article', label: '文章练习' },
 ]
 
 function App() {
@@ -22,9 +24,7 @@ function App() {
 
   return (
     <div>
-      {/* 顶部导航 */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center gap-1 px-3 py-2 bg-gray-900/90 backdrop-blur border-b border-gray-800">
-        {/* 首页按钮 */}
         <button
           onClick={() => setPage('home')}
           className={`px-2.5 py-1 rounded text-sm font-bold transition-colors ${
@@ -49,13 +49,12 @@ function App() {
           </button>
         ))}
       </nav>
-
-      {/* 页面内容 */}
       <div className="pt-10">
-        {page === 'home'   && <HomePage onNavigate={setPage} />}
-        {page === 'level1' && <Level1Page />}
-        {page === 'level2' && <Level2Page />}
-        {page === 'phrase' && <PhrasePage />}
+        {page === 'home'    && <HomePage onNavigate={setPage} />}
+        {page === 'level1'  && <Level1Page />}
+        {page === 'level2'  && <Level2Page />}
+        {page === 'phrase'  && <PhrasePage />}
+        {page === 'article' && <ArticlePage />}
       </div>
     </div>
   )

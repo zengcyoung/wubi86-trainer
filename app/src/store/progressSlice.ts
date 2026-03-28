@@ -4,18 +4,27 @@ import type { PayloadAction } from '@reduxjs/toolkit'
 export type LessonKey = 'level1' | 'level2' | 'phrase' | 'article'
 
 interface LessonProgress {
-  /** 当前练习索引 */
   currentIndex: number
-  /** 本轮正确次数 */
   correct: number
-  /** 本轮错误次数 */
   mistakes: number
-  /** 已完整过一遍的字/词（key = text，value = 累计正确数） */
   mastered: Record<string, number>
+}
+
+interface ArticleSession {
+  articleId: string | null
+  /** 开始时间戳（ms），null = 未开始 */
+  startedAt: number | null
+  /** 完成时间戳（ms），null = 未完成 */
+  finishedAt: number | null
+  /** 打了多少字（跳过标点） */
+  charsTyped: number
+  correct: number
+  mistakes: number
 }
 
 interface ProgressState {
   lessons: Record<LessonKey, LessonProgress>
+  articleSession: ArticleSession
 }
 
 const defaultLesson = (): LessonProgress => ({
@@ -25,6 +34,15 @@ const defaultLesson = (): LessonProgress => ({
   mastered: {},
 })
 
+const defaultSession = (): ArticleSession => ({
+  articleId: null,
+  startedAt: null,
+  finishedAt: null,
+  charsTyped: 0,
+  correct: 0,
+  mistakes: 0,
+})
+
 const initialState: ProgressState = {
   lessons: {
     level1: defaultLesson(),
@@ -32,6 +50,7 @@ const initialState: ProgressState = {
     phrase: defaultLesson(),
     article: defaultLesson(),
   },
+  articleSession: defaultSession(),
 }
 
 export const progressSlice = createSlice({
@@ -54,8 +73,33 @@ export const progressSlice = createSlice({
     jumpTo(state, action: PayloadAction<{ lesson: LessonKey; index: number }>) {
       state.lessons[action.payload.lesson].currentIndex = action.payload.index
     },
+    // ── 文章练习专用 ──
+    startArticle(state, action: PayloadAction<{ articleId: string }>) {
+      state.articleSession = {
+        ...defaultSession(),
+        articleId: action.payload.articleId,
+        startedAt: Date.now(),
+      }
+    },
+    articleCorrect(state) {
+      const s = state.articleSession
+      s.charsTyped += 1
+      s.correct += 1
+    },
+    articleMistake(state) {
+      state.articleSession.mistakes += 1
+    },
+    finishArticle(state) {
+      state.articleSession.finishedAt = Date.now()
+    },
+    resetArticleSession(state) {
+      state.articleSession = defaultSession()
+    },
   },
 })
 
-export const { advance, recordMistake, resetLesson, jumpTo } = progressSlice.actions
+export const {
+  advance, recordMistake, resetLesson, jumpTo,
+  startArticle, articleCorrect, articleMistake, finishArticle, resetArticleSession,
+} = progressSlice.actions
 export default progressSlice.reducer
