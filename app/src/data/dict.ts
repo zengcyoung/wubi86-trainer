@@ -1,5 +1,5 @@
 // 自动生成，勿手动修改 — scripts/build-dict.mjs
-// 完整单字码表：汉字 → 编码列表（第一个为最高权重）
+// 完整单字码表：汉字 → 编码列表
 
 export const DICT: Map<string, string[]> = new Map([
   ["工", ["a","aaa","aaaa"]],
